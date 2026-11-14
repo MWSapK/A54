@@ -1,0 +1,71 @@
+name: Android SDK Build
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build-debug-apk:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+      ANDROID_HOME: ${{ github.workspace }}/android-sdk
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Unpack Android project archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/android-project"
+          unzip -q "MrMWSK-AI-A54-Android-Studio-Project.zip" -d "$RUNNER_TEMP/android-project"
+          find "$RUNNER_TEMP/android-project" -maxdepth 4 -type f \( -name gradlew -o -name settings.gradle -o -name settings.gradle.kts \) | head
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install required Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "cmake;3.22.1" \
+            "ndk;26.3.11579264"
+
+      - name: Build the Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROJECT_DIR=$(find "$RUNNER_TEMP/android-project" -type f -name gradlew | head -n 1 | xargs dirname)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Could not locate Gradle project." >&2
+            find "$RUNNER_TEMP/android-project" -maxdepth 4 -print >&2
+            exit 1
+          fi
+          cd "$PROJECT_DIR"
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: a54-debug-apk
+          path: |
+            ${{ github.workspace }}/**/build/outputs/apk/debug/*.apk
