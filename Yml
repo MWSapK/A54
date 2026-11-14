@@ -1,0 +1,7 @@
+mkdir -p /tmp/a54-project
+unzip -q "MrMWSK-AI-A54-Android-Studio-Project.zip" -d /tmp/a54-project
+PROJECT_DIR=$(find /tmp/a54-project -type f -name gradlew -print -quit | xargs dirname)
+cd "$PROJECT_DIR"
+chmod +x gradlew
+./gradlew assembleDebug
+find "$PROJECT_DIR" -path "*build/outputs/apk/debug/*.apk" -print
